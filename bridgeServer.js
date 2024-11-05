@@ -8,6 +8,7 @@ class Request {
     this.postData = rawRequest.postData;
     this.type = rawRequest.type;
     this.url = rawRequest.url;
+    this.headers = rawRequest.headers;
   }
   get data() {
     return JSON.parse(this.postData);
