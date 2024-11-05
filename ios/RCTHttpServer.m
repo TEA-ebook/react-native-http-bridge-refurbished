@@ -1,4 +1,3 @@
-
 #import "RCTHttpServer.h"
 #import <React/RCTBridge.h>
 #import <React/RCTLog.h>
@@ -35,6 +34,7 @@ RCT_EXPORT_MODULE();
     ];
 }
 
+// Méthode modifiée pour capturer les headers
 - (void)initResponseReceivedFor:(GCDWebServer *)server forType:(NSString*)type {
     [server addDefaultHandlerForMethod:type
                           requestClass:[GCDWebServerDataRequest class]
@@ -48,25 +48,33 @@ RCT_EXPORT_MODULE();
              [self->_completionBlocks setObject:completionBlock forKey:requestId];
          }
 
+        // Capture des headers de la requête
+        NSDictionary *headers = request.headers;
+
         @try {
+            // Vérification du type de contenu et envoi des données avec les headers
             if ([GCDWebServerTruncateHeaderValue(request.contentType) isEqualToString:@"application/json"]) {
                 GCDWebServerDataRequest* dataRequest = (GCDWebServerDataRequest*)request;
                 [self sendEventWithName:@"httpServerResponseReceived"
                                                              body:@{@"requestId": requestId,
                                                                     @"postData": dataRequest.jsonObject,
                                                                     @"type": type,
-                                                                    @"url": request.URL.relativeString}];
+                                                                    @"url": request.URL.relativeString,
+                                                                    @"headers": headers}];
             } else {
                 [self sendEventWithName:@"httpServerResponseReceived"
                                                              body:@{@"requestId": requestId,
                                                                     @"type": type,
-                                                                    @"url": request.URL.relativeString}];
+                                                                    @"url": request.URL.relativeString,
+                                                                    @"headers": headers}];
             }
         } @catch (NSException *exception) {
+            // Envoi d'une réponse en cas d'erreur
             [self sendEventWithName:@"httpServerResponseReceived"
                                                          body:@{@"requestId": requestId,
                                                                 @"type": type,
-                                                                @"url": request.URL.relativeString}];
+                                                                @"url": request.URL.relativeString,
+                                                                @"headers": headers}];
         }
     }];
 }
@@ -98,6 +106,7 @@ RCT_EXPORT_METHOD(stop)
         [_webServer stop];
         [_webServer removeAllHandlers];
         _webServer = nil;
+        
     }
 }
 
@@ -106,7 +115,23 @@ RCT_EXPORT_METHOD(respond: (NSString *) requestId
                   type: (NSString *) type
                   body: (NSString *) body)
 {
-    NSData* data = [body dataUsingEncoding:NSUTF8StringEncoding];
+    NSData* data = nil;
+    if ([type isEqualToString:@"application/pdf"] ||
+        [type isEqualToString:@"image/jpeg"] ||
+        [type isEqualToString:@"image/png"] ||
+        [type isEqualToString:@"font/ttf"] ||
+        [type isEqualToString:@"audio/mpeg"] ||
+        [type isEqualToString:@"audio/mp4"] ||
+        [type isEqualToString:@"font/woff"] ||
+        [type isEqualToString:@"font/woff2"] ||
+        [type isEqualToString:@"font/eot"] ||
+        [type isEqualToString:@"font/otf"] ||
+        [type isEqualToString:@"audio/wav"]) {
+        data = [[NSData alloc] initWithBase64EncodedString:body options:0];
+    } else {
+        data = [body dataUsingEncoding:NSUTF8StringEncoding];
+    }
+    
     GCDWebServerDataResponse* requestResponse = [[GCDWebServerDataResponse alloc] initWithData:data contentType:type];
     requestResponse.statusCode = code;
 
@@ -115,7 +140,7 @@ RCT_EXPORT_METHOD(respond: (NSString *) requestId
         completionBlock = [_completionBlocks objectForKey:requestId];
         [_completionBlocks removeObjectForKey:requestId];
     }
-        completionBlock(requestResponse);
+    completionBlock(requestResponse);
 }
 
 @end
