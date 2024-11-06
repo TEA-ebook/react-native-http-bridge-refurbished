@@ -86,6 +86,24 @@ public class Server extends NanoHTTPD {
         }
     }
 
+    private static WritableMap toWritableMap(Map<String, Object> map) {
+      WritableMap writableMap = new WritableNativeMap();
+      for (Map.Entry<String, Object> entry : map.entrySet()) {
+        Object value = entry.getValue();
+        if (value instanceof String) {
+          writableMap.putString(entry.getKey(), (String) value);
+        } else if (value instanceof Integer) {
+          writableMap.putInt(entry.getKey(), (Integer) value);
+        } else if (value instanceof Double) {
+          writableMap.putDouble(entry.getKey(), (Double) value);
+        } else if (value instanceof Boolean) {
+          writableMap.putBoolean(entry.getKey(), (Boolean) value);
+        }
+        // Ajouter d'autres types si nécessaire
+      }
+      return writableMap;
+    }
+
     private WritableMap fillRequestMap(IHTTPSession session, String requestId) throws Exception {
         Method method = session.getMethod();
         WritableMap request = Arguments.createMap();
@@ -96,7 +114,7 @@ public class Server extends NanoHTTPD {
         request.putString("requestId", requestId);
 
         // Ajouter les paramètres GET
-        request.putMap("getData", MapUtil.toWritableMap((Map<String, Object>) (Map) session.getParms()));
+        request.putMap("getData", toWritableMap((Map<String, Object>) (Map) session.getParms()));
 
         // Ajouter les données POST, si disponibles
         Map<String, String> files = new HashMap<>();
