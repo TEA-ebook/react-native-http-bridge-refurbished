@@ -10,8 +10,13 @@ import com.facebook.react.modules.core.DeviceEventManagerModule;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.Random;
+import java.util.Base64;
+import java.io.ByteArrayInputStream;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.RequiresApi;
+
+import android.os.Build;
 import android.util.Log;
 
 public class Server extends NanoHTTPD {
@@ -59,22 +64,55 @@ public class Server extends NanoHTTPD {
         return response;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public void respond(String requestId, int code, String type, String body) {
+        if(type.equalsIgnoreCase("application/pdf") ||
+            type.equalsIgnoreCase("image/jpeg") ||
+            type.equalsIgnoreCase("image/png") ||
+            type.equalsIgnoreCase("font/ttf") ||
+            type.equalsIgnoreCase("audio/mpeg") ||
+            type.equalsIgnoreCase("audio/mp4") ||
+            type.equalsIgnoreCase("font/woff") ||
+            type.equalsIgnoreCase("font/woff2") ||
+            type.equalsIgnoreCase("font/eot") ||
+            type.equalsIgnoreCase("font/otf") ||
+            type.equalsIgnoreCase("audio/wav")
+        ){
+            byte[] imageBytes = Base64.getDecoder().decode(body);
+            responses.put(requestId,
+                    newFixedLengthResponse(Status.lookup(code), type, new ByteArrayInputStream(imageBytes), imageBytes.length));
+        }else{
         responses.put(requestId, newFixedLengthResponse(Status.lookup(code), type, body));
+        }
     }
 
     private WritableMap fillRequestMap(IHTTPSession session, String requestId) throws Exception {
         Method method = session.getMethod();
         WritableMap request = Arguments.createMap();
+
+        // Ajouter l'URL, le type et l'ID de la requête
         request.putString("url", session.getUri());
         request.putString("type", method.name());
         request.putString("requestId", requestId);
 
+        // Ajouter les paramètres GET
+        request.putMap("getData", MapUtil.toWritableMap((Map<String, Object>) (Map) session.getParms()));
+
+        // Ajouter les données POST, si disponibles
         Map<String, String> files = new HashMap<>();
         session.parseBody(files);
         if (files.size() > 0) {
-          request.putString("postData", files.get("postData"));
+            request.putString("postData", files.get("postData"));
         }
+
+        // Récupération des headers de la requête
+        Map<String, String> headers = session.getHeaders();
+        Log.d(TAG, headers.toString());
+        WritableMap headersMap = Arguments.createMap();
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+          headersMap.putString(entry.getKey(), entry.getValue());
+        }
+        request.putMap("headers", headersMap); // Ajout des headers à la requête
 
         return request;
     }
